@@ -1,0 +1,22 @@
+# Macro file for example B4 - collimator length sweep point: 20 mm
+#
+# Can be run in batch, without graphic
+# or interactively: Idle> /control/execute sweep_20mm.mac
+#
+# change the default number of workers (in multi-threading mode)
+/run/numberOfThreads 4
+
+# Set the collimator length for this sweep point (must come before
+# /run/initialize, or at the Idle prompt before /run/beamOn)
+/detector/setCollimatorLength 20 mm
+
+/run/initialize
+#/run/verbose 1
+/event/verbose 0
+#/tracking/verbose 1
+/run/printProgress 5
+/run/beamOn 100000000
+
+# Save this sweep point's output under its own name before the next
+# run overwrites B4.root
+/control/shell mv B4.root B4_len20mm.root
