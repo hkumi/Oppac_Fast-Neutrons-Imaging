@@ -37,6 +37,11 @@ class DetectorConstruction : public G4VUserDetectorConstruction
     G4double GetCellLength() const { return fCellLength; }
     void SetCellLength(G4double value);
 
+    // NEW: converter thickness, settable at runtime via
+    // "/detector/setConverterThickness <value> <unit>"
+    G4double GetConverterThickness() const { return fConvThickness; }
+    void SetConverterThickness(G4double value);
+
 
   private:
     // methods
@@ -59,6 +64,9 @@ class DetectorConstruction : public G4VUserDetectorConstruction
     // Change via macro command instead of editing this default for
     // a parameter sweep.
     G4double fCellLength = 5.0 * mm;
+
+    // NEW: converter thickness, default matches your current 0.01mm.
+    G4double fConvThickness = 0.01 * mm;
 
     std::unique_ptr<G4GenericMessenger> fMessenger;
 
