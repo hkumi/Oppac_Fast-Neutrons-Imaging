@@ -1,0 +1,13 @@
+# Converter thickness sweep point: 0.2 mm (200 um)
+# Collimator length held fixed at your chosen 5mm from the previous sweep.
+/run/numberOfThreads 4
+
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 0.2 mm
+
+/run/initialize
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 100000000
+
+/control/shell mv B4.root B4_conv_200um.root

@@ -57,6 +57,12 @@ set(EXAMPLEB4A_SCRIPTS
   sweep_20mm.mac
   sweep_25mm.mac
   sweep_30mm.mac
+  sweep_conv_10um.mac
+  sweep_conv_50um.mac
+  sweep_conv_100um.mac
+  sweep_conv_200um.mac
+  sweep_conv_500um.mac
+  sweep_conv_1000um.mac
 
   )
 
