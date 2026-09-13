@@ -89,6 +89,22 @@ void DetectorConstruction::DefineCommands()
         "Set the collimator (cell) length. Example: /detector/setCollimatorLength 10 mm");
     cellLengthCmd.SetParameterName("length", false);
     cellLengthCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& convThicknessCmd = fMessenger->DeclareMethodWithUnit(
+        "setConverterThickness", "mm",
+        &DetectorConstruction::SetConverterThickness,
+        "Set the HDPE converter thickness. Example: /detector/setConverterThickness 0.1 mm");
+    convThicknessCmd.SetParameterName("thickness", false);
+    convThicknessCmd.SetStates(G4State_PreInit, G4State_Idle);
+}
+
+void DetectorConstruction::SetConverterThickness(G4double value)
+{
+    fConvThickness = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Converter thickness set to " << fConvThickness / mm << " mm. "
+           << "Geometry will rebuild on next /run/initialize or /run/beamOn."
+           << G4endl;
 }
 
 void DetectorConstruction::SetCellLength(G4double value)
@@ -483,7 +499,7 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   // -------------------------- //
   // (n,p) HDPE conversor
   // -------------------------- //
-  G4double convThickness = 0.01 * mm;
+  G4double convThickness = fConvThickness;  // was hardcoded - now settable via /detector/setConverterThickness
   G4double convPos = mylPos / 2 + mylThickness / 2 + convThickness / 2;
 
   G4Box* sConv = new G4Box("conv",
