@@ -33,28 +33,11 @@
 #include "G4VUserPrimaryGeneratorAction.hh"
 #include "globals.hh"
 
-/*
-#include "CRYGenerator.h"
-#include "CRYSetup.h"
-#include "CRYParticle.h"
-*/
-
 class G4ParticleGun;
 class G4Event;
-/*
-class CRYGenerator;
-class CRYSetup;
-class G4ParticleTable;
-*/
+
 namespace B4
 {
-
-	/// The primary generator action class with particle gum.
-	///
-	/// It defines a single particle which hits the calorimeter
-	/// perpendicular to the input face. The type of the particle
-	/// can be changed via the G4 build-in commands of G4ParticleGun class
-	/// (see the macros provided with this example).
 
 	class PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
 	{
@@ -64,14 +47,19 @@ namespace B4
 
 		void GeneratePrimaries(G4Event* event) override;
 
+		G4double GetBeamX() const { return fBeamX; }
+		G4double GetBeamY() const { return fBeamY; }
+
+		static void SetSharedBeamX(G4double value) { fBeamX = value; }
+		static void SetSharedBeamY(G4double value) { fBeamY = value; }
+
 	private:
-		G4ParticleGun* fParticleGun = nullptr; // G4 particle gun
-		//CRYGenerator* cryGenerator;
-		//G4ParticleTable* particleTable;
+		G4ParticleGun* fParticleGun = nullptr;
+
+		static G4double fBeamX;
+		static G4double fBeamY;
 	};
 
 }
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
 #endif
