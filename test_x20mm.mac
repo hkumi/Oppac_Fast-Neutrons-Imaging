@@ -1,0 +1,19 @@
+# Accuracy test point: beam at x=20mm, y=0mm
+# Collimator length and converter thickness locked to your optimized values.
+# IMPORTANT: detector parameters MUST be set BEFORE /run/initialize - the
+# geometry is only ever built once, at /run/initialize, and does NOT
+# rebuild mid-session even after GeometryHasBeenModified() is flagged.
+/run/numberOfThreads 4
+
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 100 um
+/gun/setBeamX 20 mm
+/gun/setBeamY 0 mm
+
+/run/initialize
+
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 10000000
+
+/control/shell mv B4.root B4_x20mm.root

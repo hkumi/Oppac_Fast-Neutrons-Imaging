@@ -1,23 +1,23 @@
-# Macro file for example B4
+# Accuracy test point: beam at x=20mm, y=0mm, LOW collimator reflectivity
+# Same as your clean baseline (5mm collimator, 100um converter, x=20mm)
+# but with collimator wall reflectivity dropped from 0.95 (diffuse Teflon)
+# to 0.05 (matching the paper's ~5% ABS reflectance), to test whether
+# diffuse reflection - not collimator length - is driving the center-bias.
 #
-# To be run preferably in batch, without graphics:
-# % exampleB4[a,b,c,d]  -m run2.mac
-#
-# Produce Histograms and Ntuples
-#
-#/run/numberOfThreads 4
-#/control/cout/ignoreThreadsExcept 0
-#
-# reduce the verbosity level for EM and hadronic physics
-#/process/em/verbose 0
-#/process/had/verbose 0
-#
-/run/initialize
-#
-# Default kinemtics:  
-# electron 300 MeV in direction (0.,0.,1.)
-# 10000 events
-#
-/run/printProgress 1000
-/run/beamOn 10000
+# IMPORTANT: ALL /detector/... and /gun/... commands MUST come before
+# /run/initialize - geometry is built once and does not rebuild mid-session.
+/run/numberOfThreads 4
 
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 100 um
+/detector/setCollimatorReflectivity 0.05
+/gun/setBeamX 20 mm
+/gun/setBeamY 0 mm
+
+/run/initialize
+
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 10000000
+
+/control/shell mv B4.root B4_x20mm_lowrefl.root

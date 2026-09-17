@@ -63,6 +63,7 @@ set(EXAMPLEB4A_SCRIPTS
   sweep_conv_200um.mac
   sweep_conv_500um.mac
   sweep_conv_1000um.mac
+  test_x20mm.mac
 
   )
 
