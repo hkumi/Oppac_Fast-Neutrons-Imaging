@@ -29,25 +29,21 @@
 #include "PrimaryGeneratorAction.hh"
 
 #include "G4RunManager.hh"
-#include "G4LogicalVolumeStore.hh"
-#include "G4LogicalVolume.hh"
-#include "G4Box.hh"
 #include "G4Event.hh"
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4PrimaryVertex.hh"
-#include "G4PrimaryParticle.hh"
 #include "G4AnalysisManager.hh"
-#include "G4PhysicalConstants.hh"
-#include "Randomize.hh"
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <stdexcept>
 
 namespace B4
 {
+    // fBeamX/fBeamY default to (0,0) - same as the original hardcoded
+    // center beam. Set at runtime via DetectorConstruction's
+    // "/gun/setBeamX" and "/gun/setBeamY" commands (see
+    // DetectorConstruction.cc), which call SetSharedBeamX/Y() below.
+    G4double PrimaryGeneratorAction::fBeamX = 0.0;
+    G4double PrimaryGeneratorAction::fBeamY = 0.0;
+
     PrimaryGeneratorAction::PrimaryGeneratorAction()
     {
         G4int nofParticles = 1;
@@ -66,39 +62,29 @@ namespace B4
     void PrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
     {
         auto analysisManager = G4AnalysisManager::Instance();
-        //analysisManager->FillH1(2, energyMeV); // Energia en MeV
-        //analysisManager->FillNtupleDColumn(2, energyMeV);
-        //analysisManager->AddNtupleRow();
 
 		// Set gun energy
         fParticleGun->SetParticleEnergy(2.5 * MeV);
 
-        // Set gun position
-        G4double xmin = -5 * cm;
-        G4double xmax = +5 * cm;
-        G4double randomx = xmin + (xmax - xmin) * G4UniformRand();
-
-        G4double ymin = -5 * cm;
-        G4double ymax = +5 * cm;
-        G4double randomy = ymin + (ymax - ymin) * G4UniformRand();
-
 		G4double zpos = 0.5 * cm;
-        G4double xpos = 10 * cm;
-        //fParticleGun->SetParticlePosition(G4ThreeVector(randomx, randomy, 0)); // Random inside detector
-		//fParticleGun->SetParticlePosition(G4ThreeVector(0, 0, 0));             // Centered inside detector
-		fParticleGun->SetParticlePosition(G4ThreeVector(0, 0, zpos));       // Pointing to detector
+        // Beam position - reads the shared static fBeamX/fBeamY, set via
+        // /gun/setBeamX and /gun/setBeamY (registered on
+        // DetectorConstruction - see the comment in the header for why).
+		// TEMPORARY DEBUG: print what this thread actually sees for
+		// fBeamX/fBeamY, for the very first few events only (avoid
+		// flooding the log for a million-event run). Remove this once
+		// the beam-position issue is resolved.
+		static thread_local G4int debugPrintCount = 0;
+		if (debugPrintCount < 5) {
+			G4cout << "DEBUG GeneratePrimaries: fBeamX=" << fBeamX/mm
+			       << " mm, fBeamY=" << fBeamY/mm << " mm" << G4endl;
+			++debugPrintCount;
+		}
 
-        // Set gun direction
-        G4double detsize = 5 * cm;
-		G4double ratio = xpos / std::sqrt(detsize*detsize + xpos*xpos);
-        //G4double cosTheta = (1 - ratio) * G4UniformRand() + ratio, phi = twopi * G4UniformRand(); 
-        G4double cosTheta = 2 * G4UniformRand() - 1, phi = twopi * G4UniformRand();
-        G4double sinTheta = std::sqrt(1. - cosTheta * cosTheta);
-        G4double uz = sinTheta * std::cos(phi),
-            uy = sinTheta * std::sin(phi),
-            ux = cosTheta;
-        fParticleGun->SetParticleMomentumDirection(G4ThreeVector(0.0, 0.0, -1.0)); // Pointing to detector
-        //fParticleGun->SetParticleMomentumDirection(G4ThreeVector(-ux, uy, uz));   // Solid angle
+		fParticleGun->SetParticlePosition(G4ThreeVector(fBeamX, fBeamY, zpos));
+
+        fParticleGun->SetParticleMomentumDirection(G4ThreeVector(0.0, 0.0, -1.0));
+
         fParticleGun->GeneratePrimaryVertex(anEvent);
     }
 

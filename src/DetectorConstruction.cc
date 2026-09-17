@@ -60,6 +60,7 @@
 
 #include "G4GenericMessenger.hh"
 #include "G4RunManager.hh"
+#include "PrimaryGeneratorAction.hh"
 
 namespace B4
 {
@@ -83,6 +84,12 @@ void DetectorConstruction::DefineCommands()
     fMessenger = std::make_unique<G4GenericMessenger>(
         this, "/detector/", "Detector geometry control");
 
+    fGunMessenger = std::make_unique<G4GenericMessenger>(
+        this, "/gun/", "Beam position control (registered here, not on "
+        "PrimaryGeneratorAction, since that class only exists on worker "
+        "threads in MT mode and its commands wouldn't be visible to the "
+        "master thread's UI)");
+
     auto& cellLengthCmd = fMessenger->DeclareMethodWithUnit(
         "setCollimatorLength", "mm",
         &DetectorConstruction::SetCellLength,
@@ -96,6 +103,40 @@ void DetectorConstruction::DefineCommands()
         "Set the HDPE converter thickness. Example: /detector/setConverterThickness 0.1 mm");
     convThicknessCmd.SetParameterName("thickness", false);
     convThicknessCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& reflCmd = fMessenger->DeclareMethod(
+        "setCollimatorReflectivity",
+        &DetectorConstruction::SetCollimatorReflectivity,
+        "Set the collimator wall reflectivity (0-1, dimensionless). "
+        "Example: /detector/setCollimatorReflectivity 0.05");
+    reflCmd.SetParameterName("reflectivity", false);
+    reflCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& beamXCmd = fGunMessenger->DeclareMethodWithUnit(
+        "setBeamX", "mm",
+        &DetectorConstruction::SetBeamX,
+        "Set the beam's X position. Example: /gun/setBeamX 20 mm");
+    beamXCmd.SetParameterName("x", false);
+    beamXCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& beamYCmd = fGunMessenger->DeclareMethodWithUnit(
+        "setBeamY", "mm",
+        &DetectorConstruction::SetBeamY,
+        "Set the beam's Y position. Example: /gun/setBeamY -30 mm");
+    beamYCmd.SetParameterName("y", false);
+    beamYCmd.SetStates(G4State_PreInit, G4State_Idle);
+}
+
+void DetectorConstruction::SetBeamX(G4double value)
+{
+    PrimaryGeneratorAction::SetSharedBeamX(value);
+    G4cout << "Beam X position set to " << value / mm << " mm." << G4endl;
+}
+
+void DetectorConstruction::SetBeamY(G4double value)
+{
+    PrimaryGeneratorAction::SetSharedBeamY(value);
+    G4cout << "Beam Y position set to " << value / mm << " mm." << G4endl;
 }
 
 void DetectorConstruction::SetConverterThickness(G4double value)
@@ -104,6 +145,16 @@ void DetectorConstruction::SetConverterThickness(G4double value)
     G4RunManager::GetRunManager()->GeometryHasBeenModified();
     G4cout << "Converter thickness set to " << fConvThickness / mm << " mm. "
            << "Geometry will rebuild on next /run/initialize or /run/beamOn."
+           << G4endl;
+}
+
+void DetectorConstruction::SetCollimatorReflectivity(G4double value)
+{
+    fCollimatorReflectivity = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Collimator reflectivity set to " << fCollimatorReflectivity
+           << ". Remember: this command must be issued BEFORE /run/initialize "
+           << "in your macro - it will NOT take effect if set afterward."
            << G4endl;
 }
 
@@ -383,6 +434,9 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   // -------------------------- //
   G4double cellSize = kCellSize;         // 2.0 mm (sipmSize + 1mm wall) 
   G4double cellLength = fCellLength;      // was hardcoded - now settable via /detector/setCollimatorLength
+  G4cout << "DEBUG DefineVolumes() called. fCellLength = " << fCellLength / mm
+         << " mm (this should change between runs if geometry is really rebuilding)"
+         << G4endl;
   G4double nCells = kNCellsPerSide;      // 50 
   G4double collSize = nCells * cellSize;
 
@@ -467,7 +521,11 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   collimatorSurf->SetModel(unified);
   collimatorSurf->SetSigmaAlpha(0.1);   // small roughness spread for the diffuse lobe
 
-  G4double collimatorRefl[nOptic] = { 0.95, 0.95, 0.95, 0.95, 0.95, 0.95 };
+  G4double collimatorRefl[nOptic] = { fCollimatorReflectivity, fCollimatorReflectivity,
+                                       fCollimatorReflectivity, fCollimatorReflectivity,
+                                       fCollimatorReflectivity, fCollimatorReflectivity };
+  G4cout << "DEBUG DefineVolumes() called. fCollimatorReflectivity = "
+         << fCollimatorReflectivity << G4endl;
   auto collimator_mtp = new G4MaterialPropertiesTable();
   collimator_mtp->AddProperty("REFLECTIVITY", photonEnergy, collimatorRefl, nOptic);
   collimatorSurf->SetMaterialPropertiesTable(collimator_mtp);
@@ -500,6 +558,8 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   // (n,p) HDPE conversor
   // -------------------------- //
   G4double convThickness = fConvThickness;  // was hardcoded - now settable via /detector/setConverterThickness
+  G4cout << "DEBUG DefineVolumes() called. fConvThickness = " << fConvThickness / mm
+         << " mm" << G4endl;
   G4double convPos = mylPos / 2 + mylThickness / 2 + convThickness / 2;
 
   G4Box* sConv = new G4Box("conv",
