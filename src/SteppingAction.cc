@@ -33,6 +33,7 @@
 #include "DetectorParameters.hh"
 
 #include "G4Step.hh"
+#include "Randomize.hh"
 #include "G4RunManager.hh"
 #include "G4AnalysisManager.hh"
 
@@ -104,20 +105,29 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
 
   if (volName == "SiPM" && pdgCode == -22) {
 	  G4int copyNo = volume->GetCopyNo();
-      G4cout << "SiPM " << copyNo << " reached, PDG: " << pdgCode << G4endl;
 
-	  analysisManager->FillH1(0, photonEnergy);
+      // NEW: PDE cut. The photon has geometrically reached the sensor,
+      // but a real SiPM only "detects" (counts) it with probability
+      // PDE - previously every arriving photon was counted, i.e. an
+      // implicit, unrealistic 100% PDE. Either way (detected or not),
+      // the photon is absorbed at the sensor surface, so the track is
+      // still killed below regardless of the PDE draw.
+      if (G4UniformRand() < fDetConstruction->GetPDE()) {
+          G4cout << "SiPM " << copyNo << " reached, PDG: " << pdgCode << G4endl;
 
-      // side = 0,1,2,3 ; idx = position within that side's array (0..kNCellsPerSide-1)
-      // Replaces the old hardcoded copyNo<25 / 25-50 / 50-75 / 75-100 checks,
-      // which would have silently broken as soon as nCells changed.
-      G4int side = copyNo / kNCellsPerSide;
-      G4int idx  = copyNo % kNCellsPerSide;
-      analysisManager->FillH1(1 + side, idx);
+	      analysisManager->FillH1(0, photonEnergy);
 
-      // NEW: record this photon hit into the per-event raw array,
-      // used later for the offline position reconstruction (eq. 3.1).
-      fEventAction->AddSiPMHit(copyNo);
+          // side = 0,1,2,3 ; idx = position within that side's array (0..kNCellsPerSide-1)
+          // Replaces the old hardcoded copyNo<25 / 25-50 / 50-75 / 75-100 checks,
+          // which would have silently broken as soon as nCells changed.
+          G4int side = copyNo / kNCellsPerSide;
+          G4int idx  = copyNo % kNCellsPerSide;
+          analysisManager->FillH1(1 + side, idx);
+
+          // NEW: record this photon hit into the per-event raw array,
+          // used later for the offline position reconstruction (eq. 3.1).
+          fEventAction->AddSiPMHit(copyNo);
+      }
 
       step->GetTrack()->SetTrackStatus(fStopAndKill);
   }

@@ -34,6 +34,7 @@
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4AnalysisManager.hh"
+#include "Randomize.hh"
 
 namespace B4
 {
@@ -43,6 +44,8 @@ namespace B4
     // DetectorConstruction.cc), which call SetSharedBeamX/Y() below.
     G4double PrimaryGeneratorAction::fBeamX = 0.0;
     G4double PrimaryGeneratorAction::fBeamY = 0.0;
+    G4double PrimaryGeneratorAction::fBeamSpread = 0.0;   // 0 = point beam (unchanged default)
+    G4double PrimaryGeneratorAction::fBeamZ = 0.5 * cm;   // matches the original hardcoded value
 
     PrimaryGeneratorAction::PrimaryGeneratorAction()
     {
@@ -66,22 +69,20 @@ namespace B4
 		// Set gun energy
         fParticleGun->SetParticleEnergy(2.5 * MeV);
 
-		G4double zpos = 0.5 * cm;
         // Beam position - reads the shared static fBeamX/fBeamY, set via
         // /gun/setBeamX and /gun/setBeamY (registered on
         // DetectorConstruction - see the comment in the header for why).
-		// TEMPORARY DEBUG: print what this thread actually sees for
-		// fBeamX/fBeamY, for the very first few events only (avoid
-		// flooding the log for a million-event run). Remove this once
-		// the beam-position issue is resolved.
-		static thread_local G4int debugPrintCount = 0;
-		if (debugPrintCount < 5) {
-			G4cout << "DEBUG GeneratePrimaries: fBeamX=" << fBeamX/mm
-			       << " mm, fBeamY=" << fBeamY/mm << " mm" << G4endl;
-			++debugPrintCount;
-		}
+        // fBeamSpread adds a uniform random offset for flood
+        // illumination (imaging); 0 (default) means a single fixed
+        // point, exactly as in every existing test.
+        G4double x = fBeamX;
+        G4double y = fBeamY;
+        if (fBeamSpread > 0.) {
+            x += (2. * G4UniformRand() - 1.) * fBeamSpread;
+            y += (2. * G4UniformRand() - 1.) * fBeamSpread;
+        }
 
-		fParticleGun->SetParticlePosition(G4ThreeVector(fBeamX, fBeamY, zpos));
+		fParticleGun->SetParticlePosition(G4ThreeVector(x, y, fBeamZ));
 
         fParticleGun->SetParticleMomentumDirection(G4ThreeVector(0.0, 0.0, -1.0));
 

@@ -61,6 +61,7 @@
 #include "G4GenericMessenger.hh"
 #include "G4RunManager.hh"
 #include "PrimaryGeneratorAction.hh"
+#include <vector>
 
 namespace B4
 {
@@ -112,6 +113,27 @@ void DetectorConstruction::DefineCommands()
     reflCmd.SetParameterName("reflectivity", false);
     reflCmd.SetStates(G4State_PreInit, G4State_Idle);
 
+    auto& yieldCmd = fMessenger->DeclareMethod(
+        "setScintillationYield",
+        &DetectorConstruction::SetScintillationYield,
+        "Set the gas scintillation yield in photons/MeV. Default 2500000 "
+        "(borrowed from Cortesi et al.'s alpha/pure-CF4 estimate). "
+        "First-principles calculation for protons in Ar:CF4 (90/10) gives "
+        "35730000 instead. Example: /detector/setScintillationYield 35730000");
+    yieldCmd.SetParameterName("yield", false);
+    yieldCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& pdeCmd = fMessenger->DeclareMethod(
+        "setPDE",
+        &DetectorConstruction::SetPDE,
+        "Set the SiPM photon detection efficiency (0-1). Default 0.30 is "
+        "a PLACEHOLDER - confirm against the paper's Figure 3 peak PDE "
+        "before treating as final. No geometry rebuild needed - takes "
+        "effect on the next event, can be set at any time. "
+        "Example: /detector/setPDE 0.35");
+    pdeCmd.SetParameterName("pde", false);
+    pdeCmd.SetStates(G4State_PreInit, G4State_Idle);
+
     auto& beamXCmd = fGunMessenger->DeclareMethodWithUnit(
         "setBeamX", "mm",
         &DetectorConstruction::SetBeamX,
@@ -125,6 +147,76 @@ void DetectorConstruction::DefineCommands()
         "Set the beam's Y position. Example: /gun/setBeamY -30 mm");
     beamYCmd.SetParameterName("y", false);
     beamYCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& beamSpreadCmd = fGunMessenger->DeclareMethodWithUnit(
+        "setBeamSpread", "mm",
+        &DetectorConstruction::SetBeamSpread,
+        "Flood-illumination half-width for imaging - each event's "
+        "(x,y) gets a uniform random offset within +/- this value. "
+        "0 (default) = single fixed point. "
+        "Example: /gun/setBeamSpread 50 mm");
+    beamSpreadCmd.SetParameterName("spread", false);
+    beamSpreadCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& beamZCmd = fGunMessenger->DeclareMethodWithUnit(
+        "setBeamZ", "mm",
+        &DetectorConstruction::SetBeamZ,
+        "Set the beam's starting Z position. Move this further out "
+        "(e.g. beyond the resolution phantom) when the phantom is "
+        "enabled. Example: /gun/setBeamZ 35 mm");
+    beamZCmd.SetParameterName("z", false);
+    beamZCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& phantomThickCmd = fMessenger->DeclareMethodWithUnit(
+        "setPhantomThickness", "mm",
+        &DetectorConstruction::SetPhantomThickness,
+        "Set the resolution phantom's plate thickness. Default 20mm "
+        "showed no measurable contrast - try thicker. "
+        "Example: /detector/setPhantomThickness 50 mm");
+    phantomThickCmd.SetParameterName("thickness", false);
+    phantomThickCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& phantomCmd = fMessenger->DeclareMethod(
+        "setPhantomEnabled",
+        &DetectorConstruction::SetPhantomEnabled,
+        "Turn the resolution phantom on/off. Off by default - existing "
+        "point-source tests are unaffected unless this is set true. "
+        "Example: /detector/setPhantomEnabled true");
+    phantomCmd.SetParameterName("enabled", false);
+    phantomCmd.SetStates(G4State_PreInit, G4State_Idle);
+}
+
+void DetectorConstruction::SetBeamSpread(G4double value)
+{
+    PrimaryGeneratorAction::SetSharedBeamSpread(value);
+    G4cout << "Beam spread (flood illumination half-width) set to "
+           << value / mm << " mm." << G4endl;
+}
+
+void DetectorConstruction::SetBeamZ(G4double value)
+{
+    PrimaryGeneratorAction::SetSharedBeamZ(value);
+    G4cout << "Beam Z position set to " << value / mm << " mm." << G4endl;
+}
+
+void DetectorConstruction::SetPhantomThickness(G4double value)
+{
+    fPhantomThickness = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Phantom thickness set to " << fPhantomThickness / mm << " mm. "
+           << "Remember: gun Z (/gun/setBeamZ) must sit beyond the new "
+           << "front face, at more than " << (5.0 + value/mm + 5.0)
+           << " mm (box half-depth + gap + thickness)."
+           << G4endl;
+}
+
+void DetectorConstruction::SetPhantomEnabled(G4bool value)
+{
+    fPhantomEnabled = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Resolution phantom " << (fPhantomEnabled ? "ENABLED" : "disabled")
+           << ". Remember: this command must be issued BEFORE /run/initialize."
+           << G4endl;
 }
 
 void DetectorConstruction::SetBeamX(G4double value)
@@ -145,6 +237,22 @@ void DetectorConstruction::SetConverterThickness(G4double value)
     G4RunManager::GetRunManager()->GeometryHasBeenModified();
     G4cout << "Converter thickness set to " << fConvThickness / mm << " mm. "
            << "Geometry will rebuild on next /run/initialize or /run/beamOn."
+           << G4endl;
+}
+
+void DetectorConstruction::SetPDE(G4double value)
+{
+    fPDE = value;
+    G4cout << "SiPM PDE set to " << fPDE << ". No geometry rebuild needed - "
+           << "takes effect immediately." << G4endl;
+}
+
+void DetectorConstruction::SetScintillationYield(G4double value)
+{
+    fScintillationYield = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Scintillation yield set to " << fScintillationYield << " photons/MeV. "
+           << "Remember: this command must be issued BEFORE /run/initialize."
            << G4endl;
 }
 
@@ -342,7 +450,9 @@ void DetectorConstruction::DefineMaterials()
     auto ArCF4_mpt = new G4MaterialPropertiesTable();
     ArCF4_mpt->AddProperty("SCINTILLATIONCOMPONENT1", gasEnergy, gasScintSp, nScint);
     ArCF4_mpt->AddProperty("RINDEX", "Air");
-    ArCF4_mpt->AddConstProperty("SCINTILLATIONYIELD", 2500000 / MeV);
+    ArCF4_mpt->AddConstProperty("SCINTILLATIONYIELD", fScintillationYield / MeV);
+    G4cout << "DEBUG DefineMaterials() called. fScintillationYield = "
+           << fScintillationYield << " photons/MeV" << G4endl;
     ArCF4_mpt->AddConstProperty("SCINTILLATIONYIELD1", 1.0);
     ArCF4_mpt->AddConstProperty("SCINTILLATIONTIMECONSTANT1", 15 * ns);
     ArCF4_mpt->AddProperty("ABSLENGTH", gasEnergy, gasAbsLength, nScint);
@@ -407,8 +517,38 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   G4RotationMatrix* rot = nullptr;
 
 
+  // -------------------------- //
+  // OUTER WORLD - large air volume. Holds the existing gas box
+  // (unchanged: same size, same material, same absolute position at
+  // the origin - only its mother volume changes) plus, optionally,
+  // an upstream resolution phantom for imaging tests. The gun is
+  // repositioned further out in PrimaryGeneratorAction.cc when the
+  // phantom is in use, so it travels through the phantom first.
+  // -------------------------- //
+  G4double fOuterSize  = 30 * cm;
+  G4double fOuterDepth = 100 * cm;  // was 20cm - too small, caused a
+                                     // segfault when the 100mm-thick
+                                     // phantom's gun position (115mm)
+                                     // fell outside the old +/-100mm
+                                     // half-depth. Now +/-500mm gives
+                                     // headroom for much thicker
+                                     // phantoms without hitting this
+                                     // again.
+
+  G4Box* sOuterWorld = new G4Box("OuterWorld",
+      fOuterSize, fOuterSize, fOuterDepth / 2);
+
+  G4LogicalVolume* fLOuterWorld = new G4LogicalVolume(sOuterWorld,
+      G4Material::GetMaterial("G4_AIR"), "OuterWorld");
+
+  G4VPhysicalVolume* fPOuterWorld = new G4PVPlacement(0,
+      G4ThreeVector(), fLOuterWorld, "OuterWorld", 0, false, 0, fCheckOverlaps);
+
+  fLOuterWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
+
   // -------------------------- // 
-  // world - ArCF4 (90/10)
+  // world - ArCF4 (90/10)  [unchanged - just placed inside
+  // fLOuterWorld now instead of being the true top-level volume]
   // -------------------------- //
   G4double fBoxSize = 10 * cm;
   G4double fBoxDepth = 1 * cm;
@@ -420,7 +560,22 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
       atmosphere, "World");
 
   G4VPhysicalVolume* fPBox = new G4PVPlacement(0,
-      G4ThreeVector(), fLBox, "World", 0, false, 0, fCheckOverlaps);
+      G4ThreeVector(), fLBox, "World", fLOuterWorld, false, 0, fCheckOverlaps);
+
+  // -------------------------- //
+  // Resolution phantom (optional, upstream of the gas box's +z face,
+  // since the neutron travels in -z). Off by default - existing
+  // point-source tests are completely unaffected unless you turn
+  // this on with /detector/setPhantomEnabled true.
+  // -------------------------- //
+  if (fPhantomEnabled) {
+      G4double phantomThickness = fPhantomThickness;
+      G4cout << "DEBUG DefineVolumes() called. fPhantomThickness = "
+             << fPhantomThickness / mm << " mm" << G4endl;
+      G4double gapToBox = 5 * mm;
+      G4double phantomZ = fBoxDepth / 2 + gapToBox + phantomThickness / 2;
+      ConstructResolutionPhantom(fLOuterWorld, phantomZ, phantomThickness);
+  }
 
  
   G4double sensPitch = pitch;
@@ -560,6 +715,8 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   G4double convThickness = fConvThickness;  // was hardcoded - now settable via /detector/setConverterThickness
   G4cout << "DEBUG DefineVolumes() called. fConvThickness = " << fConvThickness / mm
          << " mm" << G4endl;
+  G4cout << "DEBUG DefineVolumes() called. fPhantomEnabled = "
+         << (fPhantomEnabled ? "true" : "false") << G4endl;
   G4double convPos = mylPos / 2 + mylThickness / 2 + convThickness / 2;
 
   G4Box* sConv = new G4Box("conv",
@@ -625,8 +782,61 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
   fLSiPM->SetVisAttributes(G4VisAttributes(G4Colour(1.0, 0.0, 0.0))); // Red
   
   fLBox->SetVisAttributes(G4VisAttributes::GetInvisible());
-  return fPBox;
+  return fPOuterWorld;
 
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void DetectorConstruction::ConstructResolutionPhantom(G4LogicalVolume* motherLog,
+                                                        G4double zPosition,
+                                                        G4double plateThickness)
+{
+    // A single plate with 5 round holes of different sizes, arranged
+    // along x - classic resolution bar/hole pattern. Solid regions
+    // should attenuate/scatter neutrons; the holes let more neutrons
+    // through with less scattering, so a flood-illuminated image
+    // should show brighter reconstructed density at the hole
+    // positions, with the smallest holes the hardest to resolve.
+    G4double plateSize = 100 * mm;
+
+    G4Box* solidPlate = new G4Box("SolidPlate",
+        plateSize / 2, plateSize / 2, plateThickness / 2);
+
+    std::vector<G4double> holeSizes  = {2.0*mm, 3.0*mm, 5.0*mm, 8.0*mm, 10.0*mm};
+    std::vector<G4double> xPositions = {-20*mm, -10*mm, 0*mm, 10*mm, 20*mm};
+
+    G4VSolid* plateWithHoles = solidPlate;
+    for (size_t i = 0; i < holeSizes.size(); i++) {
+        G4Tubs* solidHole = new G4Tubs(
+            "HoleSolid_" + std::to_string(i),
+            0, holeSizes[i] / 2,
+            plateThickness / 2 + 0.1 * mm,
+            0, 360 * deg);
+
+        plateWithHoles = new G4SubtractionSolid(
+            "PlateWithHole_" + std::to_string(i),
+            plateWithHoles,
+            solidHole,
+            nullptr,
+            G4ThreeVector(xPositions[i], 0, 0));
+    }
+
+    G4LogicalVolume* logicPlate = new G4LogicalVolume(
+        plateWithHoles,
+        G4Material::GetMaterial("HDPE"),
+        "ResolutionPhantom");
+
+    new G4PVPlacement(nullptr,
+        G4ThreeVector(0, 0, zPosition),
+        logicPlate,
+        "ResolutionPhantom",
+        motherLog,
+        false, 0, fCheckOverlaps);
+
+    G4VisAttributes* phantomVis = new G4VisAttributes(G4Colour(0.5, 0.5, 0.0));
+    phantomVis->SetForceSolid(true);
+    logicPlate->SetVisAttributes(phantomVis);
 }
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
