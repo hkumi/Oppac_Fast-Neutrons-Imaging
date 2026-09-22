@@ -53,11 +53,26 @@ namespace B4
 		static void SetSharedBeamX(G4double value) { fBeamX = value; }
 		static void SetSharedBeamY(G4double value) { fBeamY = value; }
 
+		// NEW: flood illumination for imaging. fBeamSpread is a
+		// half-width (mm) - each event's actual (x,y) is
+		// (fBeamX,fBeamY) plus a uniform random offset in
+		// [-fBeamSpread,+fBeamSpread] on each axis. Default 0 means
+		// every existing point-source test is completely unaffected.
+		static void SetSharedBeamSpread(G4double value) { fBeamSpread = value; }
+
+		// NEW: beam start Z position - default matches the original
+		// hardcoded 0.5cm (right at the gas box's edge). Move this
+		// further out (via /gun/setBeamZ) when the resolution phantom
+		// is enabled, so the neutron passes through the phantom first.
+		static void SetSharedBeamZ(G4double value) { fBeamZ = value; }
+
 	private:
 		G4ParticleGun* fParticleGun = nullptr;
 
 		static G4double fBeamX;
 		static G4double fBeamY;
+		static G4double fBeamSpread;
+		static G4double fBeamZ;
 	};
 
 }
