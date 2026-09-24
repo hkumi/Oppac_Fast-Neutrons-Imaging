@@ -87,6 +87,17 @@ class DetectorConstruction : public G4VUserDetectorConstruction
     G4bool GetPhantomEnabled() const { return fPhantomEnabled; }
     void SetPhantomEnabled(G4bool value);
 
+    // NEW: which phantom shape to build when enabled - 0 = the 5-hole
+    // resolution plate (default, unchanged), 1 = a water-filled sphere.
+    // Settable via "/detector/setPhantomType <0|1>".
+    G4int GetPhantomType() const { return fPhantomType; }
+    void SetPhantomType(G4int value);
+
+    // NEW: water sphere diameter, settable via
+    // "/detector/setSpherePhantomDiameter <value> <unit>"
+    G4double GetSpherePhantomDiameter() const { return fSpherePhantomDiameter; }
+    void SetSpherePhantomDiameter(G4double value);
+
     // NEW: phantom plate thickness, settable via
     // "/detector/setPhantomThickness <value> <unit>"
     G4double GetPhantomThickness() const { return fPhantomThickness; }
@@ -102,6 +113,9 @@ class DetectorConstruction : public G4VUserDetectorConstruction
     void ConstructResolutionPhantom(G4LogicalVolume* motherLog,
                                      G4double zPosition,
                                      G4double plateThickness);
+    void ConstructSpherePhantom(G4LogicalVolume* motherLog,
+                                 G4double zPosition,
+                                 G4double diameter);
 
     // data members
     //
@@ -137,6 +151,14 @@ class DetectorConstruction : public G4VUserDetectorConstruction
     // Off by default - existing point-source tests are unaffected
     // unless /detector/setPhantomEnabled true is issued.
     G4bool fPhantomEnabled = false;
+
+    // 0 = 5-hole resolution plate (default), 1 = water sphere
+    G4int fPhantomType = 0;
+
+    // Default 40mm - a reasonably-sized single test object, well
+    // within the +/-50mm detector face, large enough to be clearly
+    // resolvable given the detector's ~1.5-1.8mm resolution.
+    G4double fSpherePhantomDiameter = 40.0 * mm;
 
     // Default 20mm showed no measurable contrast (hole vs solid gave
     // near-identical yield) - settable at runtime to test thicker
