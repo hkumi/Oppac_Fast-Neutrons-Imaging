@@ -62,6 +62,7 @@
 #include "G4RunManager.hh"
 #include "PrimaryGeneratorAction.hh"
 #include <vector>
+#include "G4Orb.hh"
 
 namespace B4
 {
@@ -176,6 +177,22 @@ void DetectorConstruction::DefineCommands()
     phantomThickCmd.SetParameterName("thickness", false);
     phantomThickCmd.SetStates(G4State_PreInit, G4State_Idle);
 
+    auto& phantomTypeCmd = fMessenger->DeclareMethod(
+        "setPhantomType",
+        &DetectorConstruction::SetPhantomType,
+        "0 = 5-hole resolution plate (default), 1 = water sphere. "
+        "Example: /detector/setPhantomType 1");
+    phantomTypeCmd.SetParameterName("type", false);
+    phantomTypeCmd.SetStates(G4State_PreInit, G4State_Idle);
+
+    auto& sphereDiamCmd = fMessenger->DeclareMethodWithUnit(
+        "setSpherePhantomDiameter", "mm",
+        &DetectorConstruction::SetSpherePhantomDiameter,
+        "Set the water sphere phantom's diameter. "
+        "Example: /detector/setSpherePhantomDiameter 40 mm");
+    sphereDiamCmd.SetParameterName("diameter", false);
+    sphereDiamCmd.SetStates(G4State_PreInit, G4State_Idle);
+
     auto& phantomCmd = fMessenger->DeclareMethod(
         "setPhantomEnabled",
         &DetectorConstruction::SetPhantomEnabled,
@@ -207,6 +224,25 @@ void DetectorConstruction::SetPhantomThickness(G4double value)
            << "Remember: gun Z (/gun/setBeamZ) must sit beyond the new "
            << "front face, at more than " << (5.0 + value/mm + 5.0)
            << " mm (box half-depth + gap + thickness)."
+           << G4endl;
+}
+
+void DetectorConstruction::SetPhantomType(G4int value)
+{
+    fPhantomType = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Phantom type set to " << fPhantomType
+           << " (0=hole plate, 1=water sphere). "
+           << "Remember: this command must be issued BEFORE /run/initialize."
+           << G4endl;
+}
+
+void DetectorConstruction::SetSpherePhantomDiameter(G4double value)
+{
+    fSpherePhantomDiameter = value;
+    G4RunManager::GetRunManager()->GeometryHasBeenModified();
+    G4cout << "Sphere phantom diameter set to " << fSpherePhantomDiameter / mm
+           << " mm. Remember: this command must be issued BEFORE /run/initialize."
            << G4endl;
 }
 
@@ -563,18 +599,31 @@ G4VPhysicalVolume* DetectorConstruction::DefineVolumes(G4double pitch, G4double 
       G4ThreeVector(), fLBox, "World", fLOuterWorld, false, 0, fCheckOverlaps);
 
   // -------------------------- //
-  // Resolution phantom (optional, upstream of the gas box's +z face,
+  // Phantom (optional, upstream of the gas box's +z face,
   // since the neutron travels in -z). Off by default - existing
   // point-source tests are completely unaffected unless you turn
-  // this on with /detector/setPhantomEnabled true.
+  // this on with /detector/setPhantomEnabled 1.
   // -------------------------- //
   if (fPhantomEnabled) {
-      G4double phantomThickness = fPhantomThickness;
-      G4cout << "DEBUG DefineVolumes() called. fPhantomThickness = "
-             << fPhantomThickness / mm << " mm" << G4endl;
-      G4double gapToBox = 5 * mm;
-      G4double phantomZ = fBoxDepth / 2 + gapToBox + phantomThickness / 2;
-      ConstructResolutionPhantom(fLOuterWorld, phantomZ, phantomThickness);
+      G4cout << "DEBUG DefineVolumes() called. fPhantomType = "
+             << fPhantomType << " (0=hole plate, 1=water sphere)" << G4endl;
+
+      if (fPhantomType == 0) {
+          G4double phantomThickness = fPhantomThickness;
+          G4cout << "DEBUG DefineVolumes() called. fPhantomThickness = "
+                 << fPhantomThickness / mm << " mm" << G4endl;
+          G4double gapToBox = 5 * mm;
+          G4double phantomZ = fBoxDepth / 2 + gapToBox + phantomThickness / 2;
+          ConstructResolutionPhantom(fLOuterWorld, phantomZ, phantomThickness);
+      }
+      else if (fPhantomType == 1) {
+          G4double diameter = fSpherePhantomDiameter;
+          G4cout << "DEBUG DefineVolumes() called. fSpherePhantomDiameter = "
+                 << diameter / mm << " mm" << G4endl;
+          G4double gapToBox = 5 * mm;
+          G4double sphereZ = fBoxDepth / 2 + gapToBox + diameter / 2;
+          ConstructSpherePhantom(fLOuterWorld, sphereZ, diameter);
+      }
   }
 
  
@@ -837,6 +886,37 @@ void DetectorConstruction::ConstructResolutionPhantom(G4LogicalVolume* motherLog
     G4VisAttributes* phantomVis = new G4VisAttributes(G4Colour(0.5, 0.5, 0.0));
     phantomVis->SetForceSolid(true);
     logicPlate->SetVisAttributes(phantomVis);
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void DetectorConstruction::ConstructSpherePhantom(G4LogicalVolume* motherLog,
+                                                    G4double zPosition,
+                                                    G4double diameter)
+{
+    // A single water-filled sphere, centered at (x=0, y=0) to avoid
+    // confounding with the position-dependent resolution asymmetry
+    // found in Section 15.3 of the project log - water is another
+    // strongly hydrogenous (neutron-moderating) material, so it
+    // should give similar contrast to the HDPE hole plate for the
+    // same physical reason.
+    G4Orb* solidSphere = new G4Orb("SpherePhantom", diameter / 2);
+
+    G4LogicalVolume* logicSphere = new G4LogicalVolume(
+        solidSphere,
+        G4Material::GetMaterial("G4_WATER"),
+        "SpherePhantom");
+
+    new G4PVPlacement(nullptr,
+        G4ThreeVector(0, 0, zPosition),
+        logicSphere,
+        "SpherePhantom",
+        motherLog,
+        false, 0, fCheckOverlaps);
+
+    G4VisAttributes* sphereVis = new G4VisAttributes(G4Colour(0.0, 0.3, 0.8));
+    sphereVis->SetForceSolid(true);
+    logicSphere->SetVisAttributes(sphereVis);
 }
 
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
