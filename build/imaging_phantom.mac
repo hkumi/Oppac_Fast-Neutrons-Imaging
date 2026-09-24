@@ -1,0 +1,23 @@
+# Neutron-imaging test: resolution phantom (5 holes: 2,3,5,8,10mm)
+# flood-illuminated, 100mm phantom thickness (9.3x hole/solid contrast
+# confirmed), low-reflectivity detector settings.
+/run/numberOfThreads 4
+
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 100 um
+/detector/setCollimatorReflectivity 0.05
+/detector/setPhantomEnabled 1
+/detector/setPhantomThickness 100 mm
+
+/gun/setBeamZ 115 mm
+/gun/setBeamSpread 50 mm
+/gun/setBeamX 0 mm
+/gun/setBeamY 0 mm
+
+/run/initialize
+
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 10000000
+
+/control/shell mv B4.root B4_phantom_100mm_lowrefl.root

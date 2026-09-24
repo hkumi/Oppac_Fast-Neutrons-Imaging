@@ -1,0 +1,23 @@
+# Neutron-imaging test: resolution phantom, 100mm thickness, SCALED UP
+# to 1e8 events to try resolving the 5mm hole (borderline at 1.53
+# sigma with 1e7) and possibly the 2mm/3mm holes too.
+/run/numberOfThreads 4
+
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 100 um
+/detector/setCollimatorReflectivity 0.05
+/detector/setPhantomEnabled 1
+/detector/setPhantomThickness 100 mm
+
+/gun/setBeamZ 115 mm
+/gun/setBeamSpread 50 mm
+/gun/setBeamX 0 mm
+/gun/setBeamY 0 mm
+
+/run/initialize
+
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 100000000
+
+/control/shell mv B4.root B4_phantom_100mm_lowrefl_1e8.root

@@ -1,0 +1,22 @@
+# Quick contrast check: point beam straight through the water sphere center (x=0)
+/run/numberOfThreads 4
+
+/detector/setCollimatorLength 5 mm
+/detector/setConverterThickness 100 um
+/detector/setCollimatorReflectivity 0.05
+/detector/setScintillationYield 35730000
+/detector/setPhantomEnabled 1
+/detector/setPhantomType 1
+/detector/setSpherePhantomDiameter 40 mm
+
+/gun/setBeamZ 55 mm
+/gun/setBeamSpread 0 mm
+/gun/setBeamX 0 mm
+/gun/setBeamY 0 mm
+
+/run/initialize
+/event/verbose 0
+/run/printProgress 5
+/run/beamOn 1000000
+
+/control/shell mv B4.root B4_sphere_contrast_center.root
