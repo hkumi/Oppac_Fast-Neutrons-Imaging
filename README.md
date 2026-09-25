@@ -69,14 +69,7 @@ reconstructed from the relative light distribution across the 4 arrays.
 └── README.md
 ```
 
-## What NOT to commit (add to `.gitignore`)
 
-- **`*.root`** — output data files are large (hundreds of MB to GB each) and
-  regeneratable from the macros; do not commit them. If long-term storage is
-  needed, use Git LFS or an external data store, not the main repo.
-- `build/` — CMake build directory.
-- Any local, uncommitted macro edits used for one-off debugging (keep only
-  the macros that reproduce a documented result).
 
 ## Reproducing a result
 
